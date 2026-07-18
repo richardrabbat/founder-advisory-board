@@ -24,7 +24,7 @@ export async function POST(request: Request) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(e)}\n\n`));
       };
       try {
-        await runBoardMeeting(input, emit);
+        await runBoardMeeting(input, emit, crypto.randomUUID());
       } catch (err) {
         emit({ type: "error", message: err instanceof Error ? err.message : String(err) });
       }

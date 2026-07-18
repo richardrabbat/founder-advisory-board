@@ -1,8 +1,11 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { PRICING_ADVISORS } from "@/lib/personas";
+import { CHAIR_VOICE, PRICING_ADVISORS } from "@/lib/personas";
 import type { BoardEvent, Critique, Position, Synthesis } from "@/lib/debate";
+import { AudioQueue } from "@/lib/voice";
+import MicButton from "@/components/MicButton";
+import OpenFloor from "@/components/OpenFloor";
 
 type Stage = "idle" | "gathering" | "indexing" | "positions" | "critiques" | "synthesis" | "done";
 
@@ -43,7 +46,16 @@ export default function Home() {
   const [critiques, setCritiques] = useState<Record<string, Critique>>({});
   const [synthesis, setSynthesis] = useState<Synthesis | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [meetingId, setMeetingId] = useState<string | null>(null);
+  const [speakEnabled, setSpeakEnabled] = useState(true);
   const synthesisRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<AudioQueue | null>(null);
+  const speakRef = useRef(true);
+
+  const getAudio = useCallback((): AudioQueue => {
+    if (!audioRef.current) audioRef.current = new AudioQueue();
+    return audioRef.current;
+  }, []);
 
   const handleEvent = useCallback((e: BoardEvent) => {
     switch (e.type) {
@@ -56,14 +68,22 @@ export default function Home() {
       case "indexed":
         setDocCount(e.docCount);
         break;
-      case "position":
+      case "position": {
         setPositions((prev) => ({ ...prev, [e.advisorId]: e.position }));
+        const adv = PRICING_ADVISORS.find((a) => a.id === e.advisorId);
+        if (adv && speakRef.current) {
+          getAudio().speak(`${adv.name}: ${e.position.recommendation}`, adv.voice);
+        }
         break;
+      }
       case "critique":
         setCritiques((prev) => ({ ...prev, [e.advisorId]: e.critique }));
         break;
       case "synthesis":
         setSynthesis(e.synthesis);
+        if (speakRef.current) {
+          getAudio().speak(`The chair rules: ${e.synthesis.headline}`, CHAIR_VOICE);
+        }
         setTimeout(() => synthesisRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
         break;
       case "error":
@@ -71,9 +91,10 @@ export default function Home() {
         break;
       case "done":
         setStage("done");
+        setMeetingId(e.meetingId);
         break;
     }
-  }, []);
+  }, [getAudio]);
 
   const convene = useCallback(async () => {
     setRunning(true);
@@ -84,6 +105,8 @@ export default function Home() {
     setCritiques({});
     setSynthesis(null);
     setError(null);
+    setMeetingId(null);
+    getAudio().stop();
 
     try {
       const res = await fetch("/api/board", {
@@ -117,7 +140,7 @@ export default function Home() {
     } finally {
       setRunning(false);
     }
-  }, [question, context, urls, handleEvent]);
+  }, [question, context, urls, handleEvent, getAudio]);
 
   const stageIndex = STAGES.findIndex((s) => s.key === stage);
 
@@ -140,12 +163,15 @@ export default function Home() {
               <label className="mb-1 block text-sm font-medium text-slate-300">
                 Your question for the board
               </label>
-              <textarea
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                rows={2}
-                className="w-full rounded-lg border border-slate-700 bg-slate-950 p-3 text-sm outline-none focus:border-slate-500"
-              />
+              <div className="flex items-start gap-3">
+                <textarea
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  rows={2}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 p-3 text-sm outline-none focus:border-slate-500"
+                />
+                <MicButton onTranscript={setQuestion} disabled={running} />
+              </div>
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-300">
@@ -170,13 +196,30 @@ export default function Home() {
               />
             </div>
           </div>
-          <button
-            onClick={convene}
-            disabled={running || question.trim().length === 0}
-            className="mt-4 rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {running ? "Board in session…" : "Convene the board"}
-          </button>
+          <div className="mt-4 flex items-center gap-5">
+            <button
+              onClick={convene}
+              disabled={running || question.trim().length === 0}
+              className="rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {running ? "Board in session…" : "Convene the board"}
+            </button>
+            <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-slate-400">
+              <input
+                type="checkbox"
+                checked={speakEnabled}
+                onChange={(e) => {
+                  setSpeakEnabled(e.target.checked);
+                  speakRef.current = e.target.checked;
+                  const audio = getAudio();
+                  audio.enabled = e.target.checked;
+                  if (!e.target.checked) audio.stop();
+                }}
+                className="accent-white"
+              />
+              Board speaks aloud
+            </label>
+          </div>
         </section>
 
         {stage !== "idle" && (
@@ -368,6 +411,15 @@ export default function Home() {
               </div>
             )}
           </section>
+        )}
+
+        {meetingId && synthesis && (
+          <OpenFloor
+            key={meetingId}
+            meetingId={meetingId}
+            audio={getAudio()}
+            speakEnabled={speakEnabled}
+          />
         )}
       </main>
     </div>

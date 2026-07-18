@@ -18,6 +18,20 @@ Ask a pricing question and the board convenes:
    exposed** ("do X if A holds; inverts if B"), **dissent preserved** (never averaged away),
    and a concrete validation plan.
 
+## Voice
+
+Voice is central, not a gimmick — and the latency story is the point:
+
+- **Speak the question** — mic button (Web Speech API; Chrome recommended).
+- **The board speaks** — each advisor reads their one-line position in a distinct
+  voice (Gemini TTS `gemini-3.1-flash-tts-preview`, multi-voice), and the chair
+  reads the verdict.
+- **Open floor** — after the synthesis, ask follow-ups by voice. The meeting's
+  Moss session stays alive server-side, so answers are grounded in the same
+  evidence at **single-digit-millisecond retrieval** — the latency HUD shows the
+  breakdown per question (e.g. `moss retrieval 7ms · think 5.0s · voice 2.9s`),
+  making it visible that retrieval rounds to zero next to everything else.
+
 The design borrows from three papers: PCE (assumption-explicit planning),
 FLASK (fine-grained rubric evaluation), and the multi-agent-debate literature's
 core lesson — same-model debate converges unless disagreement is structural
