@@ -106,3 +106,25 @@ function pcmToWav(pcm: Buffer, sampleRate: number): Buffer {
   header.writeUInt32LE(pcm.length, 40);
   return Buffer.concat([header, pcm]);
 }
+
+export async function transcribeAudio(
+  audioBase64: string,
+  mimeType: string,
+): Promise<string> {
+  const res = await getAI().models.generateContent({
+    model: ADVISOR_MODEL,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          { inlineData: { mimeType, data: audioBase64 } },
+          {
+            text: "Transcribe this audio verbatim. Return only the transcript text, no commentary. If the audio contains no speech, return an empty string.",
+          },
+        ],
+      },
+    ],
+    config: { temperature: 0 },
+  });
+  return (res.text ?? "").trim();
+}
