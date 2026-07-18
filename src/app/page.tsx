@@ -93,6 +93,7 @@ export default function Home() {
 
   const audioRef = useRef<AudioQueue | null>(null);
   const speakRef = useRef(true);
+  const tableRef = useRef<HTMLElement>(null);
 
   const getAudio = useCallback((): AudioQueue => {
     if (!audioRef.current) audioRef.current = new AudioQueue();
@@ -166,6 +167,10 @@ export default function Home() {
     setModalSeat(null);
     setBubbles({ founder: { short: short(question, 110), hasDetails: true } });
     getAudio().stop();
+    setTimeout(
+      () => tableRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }),
+      100,
+    );
 
     try {
       const res = await fetch("/api/board", {
@@ -421,7 +426,7 @@ export default function Home() {
           </div>
         )}
 
-        <section className="mt-6">
+        <section ref={tableRef} className="mt-6">
           <BoardTable
             seats={SEATS}
             bubbles={bubbles}
