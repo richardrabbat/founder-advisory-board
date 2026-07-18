@@ -1,13 +1,21 @@
 // Client-side voice helpers: sequential audio playback + WAV mic recording.
 
+interface SpokenItem {
+  blob: Blob | null;
+  speakerId: string | null;
+}
+
 // Keeps spoken lines in enqueue order even though TTS fetches resolve out of
 // order: the queue holds promises and the pump awaits them sequentially.
+// `onSpeaker` fires with the speaker id while their audio plays (null when idle)
+// so the UI can light up the avatar that is actually talking.
 export class AudioQueue {
   enabled = true;
-  private queue: Array<Promise<Blob | null>> = [];
+  onSpeaker: ((id: string | null) => void) | null = null;
+  private queue: Array<Promise<SpokenItem>> = [];
   private pumping = false;
 
-  speak(text: string, voice: string): void {
+  speak(text: string, voice: string, speakerId: string | null = null): void {
     if (!this.enabled) return;
     const p = fetch("/api/speak", {
       method: "POST",
@@ -15,14 +23,15 @@ export class AudioQueue {
       body: JSON.stringify({ text, voice }),
     })
       .then((r) => (r.ok ? r.blob() : null))
-      .catch(() => null);
+      .catch(() => null)
+      .then((blob) => ({ blob, speakerId }));
     this.queue.push(p);
     void this.pump();
   }
 
-  speakBlob(blob: Blob): void {
+  speakBlob(blob: Blob, speakerId: string | null = null): void {
     if (!this.enabled) return;
-    this.queue.push(Promise.resolve(blob));
+    this.queue.push(Promise.resolve({ blob, speakerId }));
     void this.pump();
   }
 
@@ -34,8 +43,12 @@ export class AudioQueue {
     if (this.pumping) return;
     this.pumping = true;
     while (this.queue.length > 0) {
-      const blob = await this.queue.shift();
-      if (blob && this.enabled) await this.play(blob);
+      const item = await this.queue.shift();
+      if (item?.blob && this.enabled) {
+        this.onSpeaker?.(item.speakerId);
+        await this.play(item.blob);
+        this.onSpeaker?.(null);
+      }
     }
     this.pumping = false;
   }
