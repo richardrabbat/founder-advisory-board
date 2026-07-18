@@ -161,13 +161,16 @@ a debate system from turning into an unbounded token furnace.
 
 - **Headline** — the decision, one sentence
 - **Load-bearing assumptions** — each with `if it holds → do X` / `if it fails → the advice inverts`
+- **Position scorecard** — every advisor scored 1–5 on five named dimensions, with the
+  rationale behind each score
 - **Dissent** — the strongest surviving objection, and which advisor holds it
 - **Validation plan** — the cheapest real-world tests that settle it
-- **Confidence** — low / medium / high
 
 **Say it:** Dissent is a required field, not a nicety. The Chair is explicitly instructed
-never to average the disagreement away — if an advisor still objects after synthesis,
-that objection ships with the recommendation.
+never to average the disagreement away — if an advisor still objects after synthesis, that
+objection ships with the recommendation. The scorecard is the same principle applied to
+quality: you see which advisor was strongest *on which dimension*, rather than a single
+verdict on who won.
 
 ---
 
@@ -239,19 +242,42 @@ round-trip on every follow-up.
 
 ## 13. Research Grounding
 
-**Headline:** Three papers, three design decisions
+**Headline:** Two papers in the build. One on the roadmap.
 
 **On the slide:**
 
-| Paper | What we took from it |
-|---|---|
-| **PCE** — uncertainty-aware multi-agent planning | Assumption-explicit output: every recommendation ships with its load-bearing assumptions |
-| **FLASK** — fine-grained skill-based evaluation | The Chair scores proposals on named rubric dimensions, not a vibe |
-| **Multi-agent debate literature** | The core warning: debate converges unless disagreement is structural |
+**Shipped — PCE** *(Seo et al., ICLR 2026 — "From Assumptions to Actions")*
+PCE turns the assumptions left implicit in an LLM's reasoning into explicit structure you
+can act on. Every advisor position carries its `keyAssumptions`; the Chair's verdict carries
+`loadBearingAssumptions`, each with an explicit *if it holds → do X* / *if it fails → the
+advice inverts* branch. Required output fields, not stylistic flourishes.
 
-**Say it:** The debate literature is what saved us from building the obvious wrong thing.
-The finding that same-model debate collapses into agreement is exactly why we invested in
-opposed priors and separate evidence slices rather than just spawning more agents.
+**Shipped — FLASK** *(Ye et al., ICLR 2024)*
+Fine-grained skill-set scoring instead of one coarse preference number. The Chair scores
+every advisor on five named dimensions — evidence grounding, stage fit, arithmetic
+soundness, actionability, robustness under critique — on a 1–5 scale, **writing the
+rationale before committing to the number**. And there is deliberately **no overall
+average**: collapsing the dimensions back into one figure is exactly what the paper argues
+against.
+
+**Roadmap — SkillOpt-Lite** *(Shen et al., 2026)*
+Minimal-pipeline agent self-evolution. Log which advice founders accept, mine the
+transcripts, patch the advisor prompts.
+
+**Say it:** The scorecard earns its place because it discriminates. In our test run the
+Value Pricer scored 5 on actionability and 2 on stage fit; the Unit-Economics Hawk scored
+the mirror image — 5 on stage fit and robustness, 2 on actionability. That's the FLASK
+argument in one screen: a single "which advisor was best" number would have thrown away
+the only useful information, which is that each is strong somewhere different.
+
+**Also worth saying:** the design lesson that mattered most isn't from these papers at all
+— it's the multi-agent debate literature's finding that same-model debate converges. That's
+what pushed us to opposed priors and separate evidence slices instead of just spawning
+more agents.
+
+> ⚠️ Don't claim PCE's mechanism, only its idea. PCE builds a scored decision tree
+> (scenario likelihood × goal gain × execution cost). We surface assumptions with
+> conditional branches; we don't score paths. See *Handle With Care*.
 
 ---
 
@@ -350,6 +376,9 @@ Everything here was read out of the codebase — safe to put on a slide.
 - All model output is schema-constrained JSON with a retry-and-salvage path.
 - Prompt-injection posture: Bright Data's untrusted-content wrapper is stripped, and every
   prompt instructs the model to treat evidence strictly as data, never as instructions.
+- The Chair scores all three advisors on five named rubric dimensions (1–5), with a written
+  rationale per cell and deliberately no overall average. Verified live: 15/15 cells scored,
+  5 distinct values used.
 - Meeting sessions live 30 minutes server-side, then close, which is what makes the open
   floor possible.
 - Moss retrieval is in-process — no vector database in the stack.
@@ -371,6 +400,21 @@ Everything here was read out of the codebase — safe to put on a slide.
   URL — if the deck implies one, fix it or add a "runs locally" note.
 - **Don't claim the eight-advisor bench exists.** It's designed, not built. Slide 15 is
   correctly framed as next steps; keep it that way.
+- **Two of the three papers are in the build. Don't round that up to three.**
+  - *PCE* — **used**, but the idea, not the mechanism. The app makes latent assumptions
+    explicit and conditional (`keyAssumptions`, `loadBearingAssumptions` with
+    `ifHolds`/`ifFails`). PCE's actual contribution is a decision tree whose paths are
+    scored by scenario likelihood, goal-directed gain, and execution cost. Nothing in the
+    codebase scores paths. Claim the borrowing, not the framework.
+  - *FLASK* — **used.** Five named rubric dimensions in `RUBRIC_DIMENSIONS`
+    ([personas.ts](src/lib/personas.ts)), scored 1–5 per advisor by the Chair, rationale
+    declared before score in the schema so constrained decoding reasons first. No overall
+    average, by design. Verified live — see the smoke test below.
+  - *SkillOpt-Lite* — **not used.** No transcript logging, no prompt patching. Roadmap only,
+    and slide 15 already frames it that way.
+
+  "We implemented all three papers" is checkable in about thirty seconds by anyone with the
+  repo open, and the third one isn't there. Two shipped is a strong claim on its own.
 
 ## Numbers to Capture Before Presenting
 
@@ -386,6 +430,18 @@ Run the demo question, then ask a follow-up on the open floor and record the thr
 values. Substitute them into slide 11. A measured number you can defend is worth more than
 a round number you can't — and the demo will produce it in under two minutes.
 
-Worth capturing at the same time: total wall-clock for a full meeting (the "ninety
-seconds" claim on slides 1 and 5 should match reality), the doc count from the indexing
-stage, and whether all three competitor scrapes succeeded.
+Worth capturing at the same time: total wall-clock for a full meeting, the doc count from
+the indexing stage, and whether all three competitor scrapes succeeded.
+
+> ⚠️ **Re-time the meeting before repeating the "ninety seconds" claim** on slides 1 and 5.
+> The rubric adds 15 rationale-plus-score cells to the Chair's output, and an isolated
+> chair call measured **~35s** in the smoke test. Synthesis is the last stage, so total
+> meeting time went up. Either re-time it and use the real figure, or drop the specific
+> number and say "under two minutes."
+
+To re-check the rubric on its own without paying for a full meeting (one chair call, canned
+debate record, asserts all 15 cells and prints the matrix):
+
+```bash
+node --env-file=.env scripts/smoke-rubric.mjs
+```

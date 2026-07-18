@@ -16,7 +16,9 @@ Ask a pricing question and the board convenes:
 4. **Cross-examination** — one critique round; advisors attack each other's weakest assumptions.
 5. **Chair synthesis** (Gemini pro) — conditional advice with **load-bearing assumptions
    exposed** ("do X if A holds; inverts if B"), **dissent preserved** (never averaged away),
-   and a concrete validation plan.
+   a **position scorecard** (each advisor rated 1–5 on five named rubric dimensions, with
+   the rationale written before the score, and no overall average), and a concrete
+   validation plan.
 
 ## Voice
 
@@ -32,10 +34,11 @@ Voice is central, not a gimmick — and the latency story is the point:
   breakdown per question (e.g. `moss retrieval 7ms · think 5.0s · voice 2.9s`),
   making it visible that retrieval rounds to zero next to everything else.
 
-The design borrows from three papers: PCE (assumption-explicit planning),
-FLASK (fine-grained rubric evaluation), and the multi-agent-debate literature's
-core lesson — same-model debate converges unless disagreement is structural
-(different priors × different evidence).
+The design borrows from two papers — PCE (turning latent assumptions into explicit,
+conditional structure) and FLASK (fine-grained skill-set scoring in place of one
+coarse preference number) — plus the multi-agent-debate literature's core lesson:
+same-model debate converges unless disagreement is structural (different priors ×
+different evidence). SkillOpt-Lite-style self-evolution is future work.
 
 ## Stack
 
@@ -54,14 +57,20 @@ npm install
 npm run dev            # http://localhost:3000
 ```
 
-Smoke test the Gemini integration: `node --env-file=.env scripts/smoke-gemini.mjs`
+Smoke tests (live, no full meeting required):
+
+```bash
+node --env-file=.env scripts/smoke-gemini.mjs   # Gemini reachable, both tiers
+node --env-file=.env scripts/smoke-rubric.mjs   # chair rubric: 3 advisors x 5 dimensions
+```
 
 ## Layout
 
 - `src/lib/brightdata.ts` — minimal MCP-over-HTTP client (session handshake, SSE parsing)
 - `src/lib/moss.ts` — evidence session, chunking, hybrid retrieval
 - `src/lib/gemini.ts` — schema-constrained JSON generation with retry
-- `src/lib/personas.ts` — the three advisors + chair (prompts, priors, evidence queries)
+- `src/lib/personas.ts` — the three advisors + chair (prompts, priors, evidence queries,
+  rubric dimensions)
 - `src/lib/debate.ts` — the orchestrator: scrape → index → positions → critiques → synthesis
 - `src/app/api/board/route.ts` — SSE endpoint streaming board events
 - `src/app/page.tsx` — the boardroom UI

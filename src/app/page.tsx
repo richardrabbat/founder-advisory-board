@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CHAIR_VOICE, PRICING_ADVISORS } from "@/lib/personas";
+import { CHAIR_VOICE, PRICING_ADVISORS, RUBRIC_DIMENSIONS } from "@/lib/personas";
 import { COMPETITORS } from "@/lib/competitors";
 import type { BoardEvent, Critique, Position, Synthesis } from "@/lib/debate";
 import { AudioQueue } from "@/lib/voice";
@@ -630,6 +630,66 @@ function ChairDetails({
                   <td className="py-2 pr-4 text-white">{a.assumption}</td>
                   <td className="py-2 pr-4 text-emerald-300/90">{a.ifHolds}</td>
                   <td className="py-2 text-amber-300/90">{a.ifFails}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {synthesis.scorecards?.length > 0 && (
+        <div className="overflow-x-auto">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Position scorecard · 1–5 per dimension
+          </p>
+          <p className="mb-2 text-xs text-slate-500">
+            Scored by the Chair on named dimensions rather than one overall preference.
+            Hover any cell for the rationale behind the score.
+          </p>
+          <table className="w-full min-w-[520px] text-left text-xs">
+            <thead>
+              <tr className="border-b border-slate-700 text-slate-500">
+                <th className="py-2 pr-4 font-medium">Dimension</th>
+                {PRICING_ADVISORS.map((a) => (
+                  <th
+                    key={a.id}
+                    className={`py-2 pr-4 font-medium ${a.accent.text}`}
+                    title={a.prior}
+                  >
+                    {a.name}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {RUBRIC_DIMENSIONS.map((dim) => (
+                <tr key={dim.id} className="border-b border-slate-800/60 align-top">
+                  <td className="py-2 pr-4 text-slate-300" title={dim.criterion}>
+                    {dim.label}
+                  </td>
+                  {PRICING_ADVISORS.map((a) => {
+                    const scored = synthesis.scorecards
+                      .find((s) => s.advisorId === a.id)
+                      ?.dimensions.find((d) => d.dimension === dim.id);
+                    const score = scored
+                      ? Math.max(1, Math.min(5, Math.round(scored.score)))
+                      : null;
+                    return (
+                      <td
+                        key={a.id}
+                        className={`py-2 pr-4 ${a.accent.text}`}
+                        title={scored?.rationale ?? "not scored"}
+                      >
+                        <span className="font-mono text-sm">{score ?? "–"}</span>
+                        <span className="mt-1 block h-1 w-12 rounded bg-slate-800">
+                          <span
+                            className="block h-1 rounded bg-current"
+                            style={{ width: `${((score ?? 0) / 5) * 100}%` }}
+                          />
+                        </span>
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
             </tbody>

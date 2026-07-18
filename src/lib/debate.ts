@@ -12,6 +12,7 @@ import {
   CHAIR_SYSTEM_PROMPT,
   CRITIQUE_PROMPT,
   PRICING_ADVISORS,
+  RUBRIC_DIMENSIONS,
   type Advisor,
 } from "./personas";
 import { registerMeeting } from "./meetings";
@@ -34,6 +35,18 @@ export interface Critique {
   updatedView: string | null;
 }
 
+/** FLASK-style per-dimension score for one advisor's position. */
+export interface DimensionScore {
+  dimension: string;
+  rationale: string;
+  score: number;
+}
+
+export interface Scorecard {
+  advisorId: string;
+  dimensions: DimensionScore[];
+}
+
 export interface Synthesis {
   headline: string;
   recommendation: string;
@@ -44,6 +57,7 @@ export interface Synthesis {
   }>;
   dissent: string;
   validationPlan: string[];
+  scorecards: Scorecard[];
   confidence: string;
 }
 
@@ -77,6 +91,11 @@ const CRITIQUE_SCHEMA = {
   required: ["critiques", "updatedView"],
 } as const;
 
+// Constrain the Chair to real advisor ids and real rubric dimensions, so the
+// scorecard always joins cleanly against the bench in the UI.
+const ADVISOR_IDS = PRICING_ADVISORS.map((a) => a.id);
+const DIMENSION_IDS = RUBRIC_DIMENSIONS.map((d) => d.id);
+
 const SYNTHESIS_SCHEMA = {
   type: "object",
   properties: {
@@ -96,6 +115,30 @@ const SYNTHESIS_SCHEMA = {
     },
     dissent: { type: "string" },
     validationPlan: { type: "array", items: { type: "string" } },
+    // Property order matters under constrained decoding: rationale is declared
+    // before score so the model reasons its way to the number, per FLASK.
+    scorecards: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          advisorId: { type: "string", enum: ADVISOR_IDS },
+          dimensions: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                dimension: { type: "string", enum: DIMENSION_IDS },
+                rationale: { type: "string" },
+                score: { type: "integer", minimum: 1, maximum: 5 },
+              },
+              required: ["dimension", "rationale", "score"],
+            },
+          },
+        },
+        required: ["advisorId", "dimensions"],
+      },
+    },
     confidence: { type: "string", enum: ["low", "medium", "high"] },
   },
   required: [
@@ -104,6 +147,7 @@ const SYNTHESIS_SCHEMA = {
     "loadBearingAssumptions",
     "dissent",
     "validationPlan",
+    "scorecards",
     "confidence",
   ],
 } as const;
